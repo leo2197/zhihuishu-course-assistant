@@ -1,6 +1,6 @@
 {
   "name": "zhihuishu-course-assistant",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "private": true,
   "description": "Windows智慧树AI智课学习辅助工具（实验版）",
   "engines": {
@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node console.cjs",
     "check": "node console.cjs --check",
-    "test": "node test-provider.cjs && node test-first-run.cjs && node test-setup.cjs && node test-course-selection.cjs && node test-assessment.cjs && node test-core.cjs && node test-background.cjs && node test-parallel.cjs && node test-login.cjs && node test-discussions.cjs && node test-analysis.cjs && node test-notices.cjs && node test-recovery.cjs && node test-paper.cjs && node test-review.cjs"
+    "test": "node test-provider.cjs && node test-launcher.cjs && node test-first-run.cjs && node test-setup.cjs && node test-course-selection.cjs && node test-assessment.cjs && node test-core.cjs && node test-background.cjs && node test-parallel.cjs && node test-login.cjs && node test-discussions.cjs && node test-analysis.cjs && node test-notices.cjs && node test-recovery.cjs && node test-paper.cjs && node test-review.cjs"
   },
   "dependencies": {
     "playwright": "1.56.1"

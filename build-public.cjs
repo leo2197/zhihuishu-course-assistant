@@ -1,11 +1,11 @@
 const fs=require('fs'),path=require('path'),crypto=require('crypto'),{execFileSync}=require('child_process');
 const root=__dirname;
 const files=[
- 'analysis.cjs','assessment.cjs','audit.cjs','background.cjs','browser-runtime.cjs','console.cjs','course.cjs','course-selection.cjs','discussions.cjs','gate.cjs','headless.cjs','interaction.cjs','knowledge-queue.cjs','login.cjs','mistakes.cjs','models.cjs','model-queue.cjs','navigation.cjs','notices.cjs','notify.cjs','practice-choice.cjs','practice.cjs','progress-format.cjs','progress.cjs','provider-settings.cjs','references.cjs','recovery.cjs','review.cjs','runner.cjs','session-transfer.cjs','state.cjs','task-lock.cjs','task-scope.cjs','video.cjs','workflow.cjs',
- 'launch.ps1','open-console.ps1','console-mode.ps1','notify.ps1','setup-common.ps1','setup-models.ps1','settings.ps1',
- '启动.cmd','设置.cmd','选择课程.cmd','切换账号.cmd','README.md','FAQ.md','先看这里.txt','LICENSE','THIRD_PARTY_NOTICES.md','package.json','package-lock.json','.gitignore','.gitattributes','build-public.cjs',
+ 'analysis.cjs','assessment.cjs','audit.cjs','background.cjs','browser-runtime.cjs','console.cjs','course.cjs','course-selection.cjs','discussions.cjs','gate.cjs','headless.cjs','interaction.cjs','knowledge-queue.cjs','login.cjs','launcher.cjs','mistakes.cjs','models.cjs','model-queue.cjs','navigation.cjs','notices.cjs','notify.cjs','practice-choice.cjs','practice.cjs','progress-format.cjs','progress.cjs','provider-settings.cjs','references.cjs','recovery.cjs','review.cjs','runner.cjs','session-transfer.cjs','state.cjs','task-lock.cjs','task-scope.cjs','video.cjs','workflow.cjs',
+ 'entry.ps1','launch.ps1','open-console.ps1','console-mode.ps1','notify.ps1','setup-common.ps1','setup-models.ps1','settings.ps1',
+ '启动.cmd','README.md','FAQ.md','先看这里.txt','LICENSE','THIRD_PARTY_NOTICES.md','package.json','package-lock.json','.gitignore','.gitattributes','build-public.cjs',
  'examples/settings.example.json','examples/model-config.example.json','.github/workflows/check.yml','.github/ISSUE_TEMPLATE/bug_report.yml',
- 'test-analysis.cjs','test-assessment.cjs','test-background.cjs','test-core.cjs','test-discussions.cjs','test-login.cjs','test-notices.cjs','test-paper.cjs','test-parallel.cjs','test-provider.cjs','test-recovery.cjs','test-review.cjs','test-first-run.cjs','test-setup.cjs','test-course-selection.cjs'
+ 'test-analysis.cjs','test-assessment.cjs','test-background.cjs','test-core.cjs','test-discussions.cjs','test-login.cjs','test-launcher.cjs','test-notices.cjs','test-paper.cjs','test-parallel.cjs','test-provider.cjs','test-recovery.cjs','test-review.cjs','test-first-run.cjs','test-setup.cjs','test-course-selection.cjs'
 ];
 function copyPublic(target){
  for(const name of files){const dest=path.join(target,name);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.copyFileSync(path.join(root,name),dest);}
@@ -49,7 +49,7 @@ async function build(){
   fs.cpSync(path.join(root,'node_modules'),path.join(app,'node_modules'),{recursive:true});
   const runtime=await nodeRuntime();fs.mkdirSync(path.join(app,'runtime'),{recursive:true});for(const name of ['node.exe','LICENSE'])fs.copyFileSync(path.join(runtime.directory,name),path.join(app,'runtime',name));
   fs.writeFileSync(path.join(app,'runtime','provenance.json'),JSON.stringify({source:'https://nodejs.org/dist/latest-v24.x/',archive:runtime.archive,sha256:runtime.sha256},null,2));
-  for(const [name,script,args]of[['启动.cmd','launch.ps1',''],['设置.cmd','settings.ps1',''],['选择课程.cmd','settings.ps1',' -Page Course'],['切换账号.cmd','settings.ps1',' -Page Account']])fs.writeFileSync(path.join(portable,name),'@echo off\r\nchcp 65001 >nul\r\ncd /d "%~dp0app"\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0app\\'+script+'"'+args+'\r\npause\r\n');
+  fs.writeFileSync(path.join(portable,'启动.cmd'),require('./launcher.cjs').makeLauncher());
   fs.copyFileSync(path.join(root,'README.md'),path.join(portable,'使用说明.md'));fs.copyFileSync(path.join(root,'先看这里.txt'),path.join(portable,'先看这里.txt'));fs.copyFileSync(path.join(root,'FAQ.md'),path.join(portable,'常见问题.md'));
   execFileSync(path.join(app,'runtime','node.exe'),[path.join(app,'console.cjs'),'--check'],{stdio:'pipe',windowsHide:true});
   // Scan the copied original files again; node_modules and the official runtime

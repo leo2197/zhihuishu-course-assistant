@@ -66,7 +66,7 @@ async function prepare(page,settings,store,{log=console.log}={}){
    await require('./interaction.cjs').quietClick(login);
   },
   commit(verifiedAccount){
-   if(pending&&pending.account===verifiedAccount){try{save(store.directory,pending);log('【已记住登录】姓名与学号核对通过，学校、学号和密码已用Windows加密保存在本机。下次优先复用登录状态，失效时自动填写；滑块或短信验证由本人完成。切换账号请使用“切换账号.cmd”。');}catch{log('本次登录成功，但凭据加密保存失败；没有保存明文密码。');}pending=null;}
+   if(pending&&pending.account===verifiedAccount){try{save(store.directory,pending);log('【已记住登录】姓名与学号核对通过，学校、学号和密码已用Windows加密保存在本机。下次优先复用登录状态，失效时自动填写；滑块或短信验证由本人完成。切换账号请使用“启动.cmd”菜单中的“添加或切换账号”。');}catch{log('本次登录成功，但凭据加密保存失败；没有保存明文密码。');}pending=null;}
   }
  };sessions.set(page,helper);return helper;
 }

@@ -18,7 +18,7 @@ function load(source=file){
   const config={};for(const line of fs.readFileSync(legacy,'utf8').split(/\r?\n/)){const i=line.indexOf('=');if(i>0&&!line.trim().startsWith('#'))config[line.slice(0,i).trim()]=line.slice(i+1).trim();}
   if(config.BASE_URL&&config.API_KEY)return {url:endpoint(config.BASE_URL),key:config.API_KEY};
  }
- throw Error('尚未配置模型：请双击“设置.cmd”，选择“模型设置”，填写服务地址、API Key和模型ID');
+ throw Error('尚未配置模型：请双击“启动.cmd”菜单中的“模型设置与检测”，选择“模型设置”，填写服务地址、API Key和模型ID');
 }
 async function test(value,{fetchFn=fetch}={}){
  const url=endpoint(value.url),models=[...new Set([value.answerModel,value.judgeModel].filter(Boolean))];
