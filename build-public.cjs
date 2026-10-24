@@ -1,11 +1,11 @@
 const fs=require('fs'),path=require('path'),crypto=require('crypto'),{execFileSync}=require('child_process');
 const root=__dirname;
 const files=[
- 'analysis.cjs','assessment.cjs','audit.cjs','background.cjs','browser-runtime.cjs','console.cjs','course.cjs','course-selection.cjs','discussions.cjs','gate.cjs','headless.cjs','interaction.cjs','knowledge-queue.cjs','login.cjs','launcher.cjs','mistakes.cjs','models.cjs','model-queue.cjs','navigation.cjs','notices.cjs','notify.cjs','practice-choice.cjs','practice.cjs','progress-format.cjs','progress.cjs','provider-settings.cjs','references.cjs','recovery.cjs','review.cjs','runner.cjs','session-transfer.cjs','state.cjs','task-lock.cjs','task-scope.cjs','video.cjs','workflow.cjs',
+ 'analysis.cjs','assessment.cjs','audit.cjs','background.cjs','browser-runtime.cjs','console.cjs','course.cjs','course-selection.cjs','discussions.cjs','gate.cjs','headless.cjs','interaction.cjs','knowledge-queue.cjs','login.cjs','launcher.cjs','mistakes.cjs','models.cjs','model-queue.cjs','navigation.cjs','notices.cjs','notify.cjs','practice-choice.cjs','practice.cjs','progress-format.cjs','progress.cjs','provider-settings.cjs','references.cjs','recovery.cjs','review.cjs','runner.cjs','session-transfer.cjs','state.cjs','task-lock.cjs','task-scope.cjs','video.cjs','web-login.cjs','workflow.cjs',
  'entry.ps1','launch.ps1','open-console.ps1','console-mode.ps1','notify.ps1','setup-common.ps1','setup-models.ps1','settings.ps1',
  '启动.cmd','README.md','FAQ.md','先看这里.txt','LICENSE','THIRD_PARTY_NOTICES.md','package.json','package-lock.json','.gitignore','.gitattributes','build-public.cjs',
  'examples/settings.example.json','examples/model-config.example.json','.github/workflows/check.yml','.github/ISSUE_TEMPLATE/bug_report.yml',
- 'test-analysis.cjs','test-assessment.cjs','test-background.cjs','test-core.cjs','test-discussions.cjs','test-login.cjs','test-launcher.cjs','test-notices.cjs','test-paper.cjs','test-parallel.cjs','test-provider.cjs','test-recovery.cjs','test-review.cjs','test-first-run.cjs','test-setup.cjs','test-course-selection.cjs'
+ 'test-analysis.cjs','test-assessment.cjs','test-background.cjs','test-core.cjs','test-discussions.cjs','test-login.cjs','test-launcher.cjs','test-notices.cjs','test-paper.cjs','test-parallel.cjs','test-provider.cjs','test-model-autoconfig.cjs','test-web-login.cjs','test-recovery.cjs','test-review.cjs','test-first-run.cjs','test-setup.cjs','test-course-selection.cjs'
 ];
 function copyPublic(target){
  for(const name of files){const dest=path.join(target,name);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.copyFileSync(path.join(root,name),dest);}

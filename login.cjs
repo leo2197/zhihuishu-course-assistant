@@ -27,11 +27,13 @@ async function prepare(page,settings,store,{log=console.log}={}){
  let pending=null,cached=null,attempted=false,prefilled=false,loginFailureAnnounced=false;
  try{cached=read(store.directory,settings.account);}catch(error){log(error.message);}
  await page.exposeBinding('ocsRememberLogin',({frame},value)=>{
-  if(new URL(frame.url()).hostname!=='login.zhihuishu.com'||value?.account!==settings.account||typeof value.password!=='string'||!value.school)return;
+  if(new URL(frame.url()).hostname!=='login.zhihuishu.com'||(!settings.discoverIdentity&&value?.account!==settings.account)||!/^\d+$/.test(value?.account)||typeof value.password!=='string'||!value.school)return;
   pending={account:value.account,school:value.school,password:value.password};
  });
  await page.addInitScript(captureLogin);await page.evaluate(captureLogin);
  const helper={
+  school(){return pending?.school||cached?.school||'';},
+  adopt(account,targetStore){settings.account=account;settings.discoverIdentity=false;store=targetStore;if(cached?.account!==account)cached=null;},
   notifyInitial(){if(!cached&&page.context().ocsDesktopNotifications)require('./notify.cjs').notify('首次登录需要本人操作','请打开智慧树专用Edge完成首次登录和验证。成功核对身份后会在本机加密记住登录信息。');},
   notice(){return cached?'【自动登录】已记住本机账号，将自动填写学校、学号和密码；如出现滑块、短信或其他安全验证，请本人完成。密码变更或登录信息失效时需重新输入。':'【首次登录，需要本人操作】请从任务栏打开专用Edge，选择学校、输入学号和密码并完成安全验证。身份核对通过后，将在本机加密保存登录信息；后续自动填写，安全验证仍需本人完成。';},
   async tick(){
@@ -41,7 +43,7 @@ async function prepare(page,settings,store,{log=console.log}={}){
    if(await id.count()!==1||!await id.isVisible()){
     const tab=page.getByText('学号登录',{exact:true});if(await tab.count()===1&&await tab.isVisible())await tab.click({timeout:1500});return;
    }
-   if(!prefilled){await id.fill(settings.account);prefilled=true;}
+   if(!prefilled&&settings.account){await id.fill(settings.account);prefilled=true;}
    if(!cached)return;
    const combo=page.getByRole('combobox');
    if(await combo.count()!==1)return;
@@ -66,7 +68,7 @@ async function prepare(page,settings,store,{log=console.log}={}){
    await require('./interaction.cjs').quietClick(login);
   },
   commit(verifiedAccount){
-   if(pending&&pending.account===verifiedAccount){try{save(store.directory,pending);log('【已记住登录】姓名与学号核对通过，学校、学号和密码已用Windows加密保存在本机。下次优先复用登录状态，失效时自动填写；滑块或短信验证由本人完成。切换账号请使用“启动.cmd”菜单中的“添加或切换账号”。');}catch{log('本次登录成功，但凭据加密保存失败；没有保存明文密码。');}pending=null;}
+   if(pending&&pending.account===verifiedAccount){try{save(store.directory,pending);cached=pending;log('【已记住登录】姓名与学号核对通过，学校、学号和密码已用Windows加密保存在本机。下次优先复用登录状态，失效时自动填写；滑块或短信验证由本人完成。切换账号请使用“启动.cmd”菜单中的“添加或切换账号”。');}catch{log('本次登录成功，但凭据加密保存失败；没有保存明文密码。');}pending=null;}
   }
  };sessions.set(page,helper);return helper;
 }

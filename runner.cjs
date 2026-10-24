@@ -53,17 +53,27 @@ async function runExisting(){
 async function run(){
  if(process.argv.includes('--connect-existing'))return runExisting();
  const settings=require('./settings.json');
- if(!/^\d+$/.test(settings.account))throw Error('账号配置无效');
+ if(settings.account&&!/^\d+$/.test(settings.account))throw Error('账号配置无效');
+ const profile=settings.browserProfile||settings.account||'login-'+require('crypto').randomUUID();if(!/^[A-Za-z0-9_-]+$/.test(profile))throw Error('浏览器资料标识无效');if(!settings.account){settings.browserProfile=profile;fs.writeFileSync(path.join(__dirname,'settings.json'),JSON.stringify(settings,null,2));}
  console.log('自动打开专用Edge；浏览器和脚本窗口正常显示，课程跳转复用同一标签。');
- const context=await chromium.launchPersistentContext(path.join(__dirname,'profiles',settings.account),{channel:'msedge',headless:false,viewport:null,args:[...(settings.startMinimized?['--start-minimized']:[]),'--mute-audio','--disable-background-timer-throttling','--disable-renderer-backgrounding','--remote-debugging-port=9236','--remote-debugging-address=127.0.0.1']});
- try{if(await require('./session-transfer.cjs').restore(context,settings.account))console.log('已恢复本次安全切换前的加密登录会话。');}catch{console.log('切换会话未恢复，改用平台正常登录流程。');}
+ const context=await chromium.launchPersistentContext(path.join(__dirname,'profiles',profile),{channel:'msedge',headless:false,viewport:null,args:[...(settings.startMinimized?['--start-minimized']:[]),'--mute-audio','--disable-background-timer-throttling','--disable-renderer-backgrounding','--remote-debugging-port=9236','--remote-debugging-address=127.0.0.1']});
+ try{if(settings.account&&await require('./session-transfer.cjs').restore(context,settings.account))console.log('已恢复本次安全切换前的加密登录会话。');}catch{console.log('切换会话未恢复，改用平台正常登录流程。');}
  context.ocsDesktopNotifications=true;context.ocsVerificationStatusFile=path.join(__dirname,'data',settings.account,'verification-status.json');
  const page=await require('./background.cjs').registerTaskPage(context,context.pages()[0]||await context.newPage());
  try{
+  if(!settings.account){
+   settings.discoverIdentity=true;
+   const pendingStore={directory:path.join(__dirname,'work','pending-login'),save(){}};
+   const helper=await require('./login.cjs').prepare(page,settings,pendingStore);
+   console.log('首次使用：请直接在网页选择学校并登录，完成验证后打开要学习的AI智课；不用在控制台填写个人信息。');
+   await require('./course-selection.cjs').select(page,settings,pendingStore,{saveSettings:()=>{}});
+   await require('./web-login.cjs').discover(page,settings,helper);context.ocsVerificationStatusFile=path.join(__dirname,'data',settings.account,'verification-status.json');
+  }
   if(!settings.courseUrl||process.argv.includes('--select-course-only')){
    const store=new (require('./state.cjs').Store)(settings.account);await require('./course-selection.cjs').select(page,settings,store);
    if(process.argv.includes('--select-course-only')){await require('./workflow.cjs').verifyIdentity(context,settings,store);await require('./session-transfer.cjs').save(context,settings.account);console.log('已记住此账号的课程。下次点击启动即可继续。');return;}
   }
+  if(process.argv.includes('--login-only')){const store=new (require('./state.cjs').Store)(settings.account);await require('./workflow.cjs').verifyIdentity(context,settings,store);await require('./session-transfer.cjs').save(context,settings.account);console.log('网页登录已记住。接下来只需设置API地址和Key，随后自动返回课程。');return;}
   if(process.argv.includes('--verify-only')){
    const store=new (require('./state.cjs').Store)(settings.account);
    await require('./workflow.cjs').verifyIdentity(context,settings,store);
@@ -88,7 +98,7 @@ async function run(){
 
   console.log('本轮结束，浏览器保留可见。关闭课程浏览器后本窗口结束。');
   if(!page.isClosed())await new Promise(resolve=>context.once('close',resolve));
- }catch(error){console.log('保留已有进度与提交保护：'+error.message);if(!page.isClosed())await new Promise(resolve=>context.once('close',resolve));}
+ }catch(error){process.exitCode=1;console.log('保留已有进度与提交保护：'+error.message);if(!page.isClosed())await new Promise(resolve=>context.once('close',resolve));}
  finally{await context.close().catch(()=>{});}
 }
 if(require.main===module)(process.argv.includes('--open-profile')?open():run()).catch(e=>{console.error(e.message);process.exitCode=1});

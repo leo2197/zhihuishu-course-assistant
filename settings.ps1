@@ -18,13 +18,16 @@ function Set-Account {
         $selected=$accounts[$index-1];$settings.account=$selected.account;$settings.expectedDisplayName=$selected.expectedDisplayName
         $settings | Add-Member -NotePropertyName school -NotePropertyValue $selected.school -Force
         $settings.courseUrl=$selected.courseUrl;$settings.courseName=$selected.courseName
+        $settings | Add-Member -NotePropertyName browserProfile -NotePropertyValue $selected.browserProfile -Force
     }else{
-        $school=Read-OcsValue '学校全称';$account=Read-OcsValue '学号';$name=Read-OcsValue '姓名（用于防止登录错账号）'
-        if(-not $school -or $account -notmatch '^\d+$' -or -not $name){throw '学校、数字学号和姓名都必须填写。'}
-        $settings.account=$account;$settings.expectedDisplayName=$name;$settings.courseUrl='';$settings.courseName=''
-        $settings | Add-Member -NotePropertyName school -NotePropertyValue $school -Force
-        $comments=Read-OcsValue '是否自动发表课程讨论？输入y开启，默认不发表' 'n';$settings.autoPostDiscussions=$comments -eq 'y'
-        Write-OcsJson (Join-Path $folder ($account+'/account.json')) @{account=$account;school=$school;expectedDisplayName=$name;courseUrl='';courseName=''}
+        $settings.account='';$settings.expectedDisplayName='';$settings.courseUrl='';$settings.courseName=''
+        $settings | Add-Member -NotePropertyName browserProfile -NotePropertyValue '' -Force
+        Save-Settings
+        Write-Host '请直接在即将打开的网页登录并选择课程，个人信息会从本人课程页读取。' -ForegroundColor Cyan
+        & (Get-OcsNode) (Join-Path $PSScriptRoot 'console.cjs') --login-only
+        if($LASTEXITCODE -ne 0){throw '网页登录未完成，原账号资料仍保留。'}
+        $script:settings=Read-OcsJson $settingsPath
+        if(-not $settings.account -or -not $settings.expectedDisplayName){throw '网页账号尚未确认，请在专用Edge完成登录并打开课程知识学习目录后重试。'}
     }
     Save-Settings
     Write-Host '首次登录需本人在浏览器选择学校、输入密码并完成验证；成功核对身份后会加密记忆。后续自动填写，安全验证仍由本人完成。' -ForegroundColor Cyan
@@ -44,13 +47,13 @@ function Set-Parallel {
     Write-Host '已保存。空闲窗口自动领取下一个任务；只剩一个可处理知识点时，多余窗口会显示空闲原因。模型服务限流时请调低窗口数。'
 }
 if($Page -eq 'FirstRun'){
-    if(-not $settings.account){Set-Account}else{Save-Settings}
+    Save-Settings
     $providerCheck=& (Get-OcsNode) -e "try{require('./provider-settings.cjs').load();process.exit(0)}catch{process.exit(1)}"
     $providerFailed=$LASTEXITCODE -ne 0;$modelState=Read-OcsJson (Join-Path $PSScriptRoot 'model-config.json');if($providerFailed -or -not $modelState.answerModel -or -not $modelState.judgeModel){& (Join-Path $PSScriptRoot 'setup-models.ps1') -SkipRunningCheck}
-    Write-Host '首次设置已完成。启动后请选择课程，并按提示处理登录与安全验证。'
+    Write-Host 'API设置完成。接下来自动打开网页，请本人登录后打开课程的知识学习目录。'
     exit
 }
-switch($Page){'Account'{Set-Account;exit};'Models'{& (Join-Path $PSScriptRoot 'setup-models.ps1');exit};'Course'{Select-Course;exit};'Parallel'{Set-Parallel;exit}}
+switch($Page){'Account'{Set-Account;exit};'Models'{$mode=Read-OcsValue '回车自动检测模型，输入2使用高级自选模型' '1';if($mode -eq '2'){& (Join-Path $PSScriptRoot 'setup-models.ps1') -Advanced}else{& (Join-Path $PSScriptRoot 'setup-models.ps1')};exit};'Course'{Select-Course;exit};'Parallel'{Set-Parallel;exit}}
 while($true){
     Write-Host "`n1 学校与账号 / 切换账号`n2 选择或切换课程`n3 模型设置与检测`n4 并发窗口数量`n5 返回"
     switch(Read-Host '请输入序号'){'1'{Set-Account};'2'{Select-Course};'3'{& (Join-Path $PSScriptRoot 'setup-models.ps1')};'4'{Set-Parallel};'5'{exit};default{Write-Host '请输入1到5。'}}

@@ -10,6 +10,7 @@ async function ask({text,image,model,hasDiagram=false}){
  const result=await response.json();return {...parse(result.choices?.[0]?.message?.content),model};
 }
 async function solve(question,{askFn=ask}={}){
+ if(question.hasDiagram&&!config.visionJudgeModel)return {answers:[],decision:'review',reason:'未确认可用图像模型，请在高级模型设置指定或人工核对此题',model:'manual-review'};
  console.log('主答模型 '+config.answerModel+'；最终裁决 '+(question.hasDiagram?config.visionJudgeModel:config.judgeModel));
  const heartbeat=setInterval(()=>console.log('模型仍在核验本题，尚未提交……'),15000);heartbeat.unref();
  try{

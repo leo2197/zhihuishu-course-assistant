@@ -4,6 +4,8 @@ function endpoint(value){
  const url=new URL(String(value).trim());
  if(url.protocol!=='https:'&&!(url.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(url.hostname)))throw Error('服务地址需要使用HTTPS，本机服务可使用HTTP');
  if(url.username||url.password||url.search||url.hash)throw Error('服务地址不能包含密码、查询参数或片段');
+ if(url.hostname==='open.bigmodel.cn'&&(url.pathname==='/'||url.pathname.startsWith('/apikey')))url.pathname='/api/paas/v4';
+ if(/\/(?:console|platform|apikey)(?:\/|$)/.test(url.pathname))throw Error('这是网页地址，请填写服务商的API接口地址');
  url.pathname=url.pathname.replace(/\/$/,'');
  if(!url.pathname.endsWith('/chat/completions'))url.pathname+='/chat/completions';
  return url.href;
@@ -30,8 +32,24 @@ async function test(value,{fetchFn=fetch}={}){
  }
  return true;
 }
+async function auto(value,{fetchFn=fetch,log=console.log}={}){
+ const url=endpoint(value.url),official=new URL(url).hostname==='open.bigmodel.cn';let listed=[];
+ try{const response=await fetchFn(url.replace(/\/chat\/completions$/,'/models'),{headers:{Authorization:'Bearer '+value.key},signal:AbortSignal.timeout(15000)});if(response.status===401)throw Error('API Key无效或已失效');if(response.ok){const data=await response.json();listed=(data.data||[]).filter(m=>typeof m.id==='string'&&!/embedding|rerank|whisper|tts|image-gen|dall-e/i.test(m.id));}}catch(error){if(/API Key/.test(error.message))throw error;if(/fetch failed|timeout|abort|ENOTFOUND/i.test(error.message))throw Error('无法连接模型服务，请检查API地址和网络后重试');}
+ const find=id=>listed.find(m=>m.id.toLowerCase()===id),ids=listed.map(m=>m.id);
+ const prefer=['glm-5.3-flash','glm-5.3','glm-5','glm-4.7','glm-4.6','deepseek-reasoner','deepseek-chat'];
+ const primary=prefer.map(find).find(Boolean)||listed[0];
+ const answerModel=primary?.id||(official?'glm-5.3-flash':null);
+ if(!answerModel)throw Error('服务未提供可识别模型列表。请在模型设置中选择“高级”，自行填写模型ID；不需要更换服务商。');
+ let judgeModel=find('glm-5.3')?.id||answerModel;
+ if(official&&!listed.length)judgeModel='glm-5.3';
+ let visionJudgeModel=listed.find(m=>m.id.toLowerCase()==='glm-5.3-flash'||m.input_modalities?.includes('image')||m.capabilities?.vision===true)?.id||(official&&!listed.length?'glm-5.3-flash':'');
+ log('自动识别主答：'+answerModel+'；裁决：'+judgeModel+'；图像：'+(visionJudgeModel||'未确认，图片题交人工核对'));
+ await test({...value,url,answerModel,judgeModel:answerModel},{fetchFn});
+ if(judgeModel!==answerModel){try{await test({...value,url,answerModel:judgeModel},{fetchFn});}catch(error){if(/余额|限流|Key|超时|fetch failed/.test(error.message))throw error;log('裁决模型不可用，使用已检测通过的主答模型裁决：'+answerModel);judgeModel=answerModel;}}
+ return {answerModel,judgeModel,visionJudgeModel,reasoningEffort:'high',timeoutMs:90000,autoSubmit:true};
+}
 if(require.main===module){
  const pending=process.argv[process.argv.indexOf('--test-file')+1];
- (async()=>{const value=load(pending);console.log('正在检测主答与裁决模型，检测可能产生少量调用费用……');await test(value);console.log('模型连接与权限检测通过。');})().catch(error=>{console.error(/timeout|abort/i.test(error.message)?'检测超时，请检查服务地址和网络后重试':error.message);process.exitCode=1;});
+ (async()=>{const value=load(pending);console.log('检测可能产生少量调用费用，以服务商计费为准。');if(process.argv.includes('--auto')){const result=await auto(value),output=process.argv[process.argv.indexOf('--output')+1];fs.writeFileSync(output,JSON.stringify(result,null,2));}else await test(value);console.log('模型连接与权限检测通过。');})().catch(error=>{console.error(/timeout|abort|fetch failed/i.test(error.message)?'接口连接失败或超时，请检查API接口地址和网络；密钥管理网页不是API地址':error.message);process.exitCode=1;});
 }
-module.exports={file,endpoint,load,test};
+module.exports={file,endpoint,load,test,auto};
