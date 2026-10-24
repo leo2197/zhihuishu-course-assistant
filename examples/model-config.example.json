@@ -1,0 +1,8 @@
+{
+  "answerModel": "",
+  "judgeModel": "",
+  "visionJudgeModel": "",
+  "reasoningEffort": "high",
+  "timeoutMs": 90000,
+  "autoSubmit": true
+}

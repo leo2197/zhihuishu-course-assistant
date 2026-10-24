@@ -1,0 +1,12 @@
+{
+  "account": "",
+  "expectedDisplayName": "",
+  "school": "",
+  "courseUrl": "",
+  "courseName": "",
+  "knowledgeWorkers": 2,
+  "maxPracticeRounds": 12,
+  "autoPostDiscussions": false,
+  "uncertainPracticeStrategy": "review",
+  "startMinimized": false
+}

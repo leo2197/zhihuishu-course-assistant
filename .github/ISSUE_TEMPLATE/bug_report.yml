@@ -1,0 +1,33 @@
+name: 问题反馈
+description: 请提供版本、操作步骤和脱敏后的错误文字
+body:
+  - type: markdown
+    attributes:
+      value: 请先阅读README和FAQ。不要提交密码、API Key、Cookie、个人学习资料或浏览器配置目录。
+  - type: input
+    id: version
+    attributes:
+      label: 程序版本
+      placeholder: 例如 v0.1.0-alpha.2
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Windows与Edge版本
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 在哪一步发生？如何复现？
+      placeholder: 下载与解压、首次设置、登录验证、选课、学习、退出或升级？请说明课程类型，不要贴个人账号。
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: 脱敏后的错误文字
+      description: 请手动删除账号、姓名、密码、Key、Cookie等个人信息，不要上传data/profiles/config目录。
+    validations:
+      required: true

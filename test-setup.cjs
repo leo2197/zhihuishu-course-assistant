@@ -1,0 +1,16 @@
+const assert=require('assert/strict'),fs=require('fs'),path=require('path'),os=require('os'),{spawnSync}=require('child_process'),{protect}=require('./login.cjs');
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ocs-setup-fixture-'));fs.mkdirSync(path.join(dir,'examples'));
+for(const name of ['settings.ps1','setup-common.ps1','setup-models.ps1'])fs.copyFileSync(path.join(__dirname,name),path.join(dir,name));
+for(const name of ['settings.example.json','model-config.example.json'])fs.copyFileSync(path.join(__dirname,'examples',name),path.join(dir,'examples',name));
+function run(script,answers,page=''){
+ const code=`$global:FixtureAnswers=${JSON.stringify(answers).replaceAll('"',"'").replace('[','@(').replace(']',')')};$global:FixtureIndex=0;function global:Read-Host {param($Prompt,[switch]$AsSecureString) $v=$global:FixtureAnswers[$global:FixtureIndex];$global:FixtureIndex++;if($AsSecureString){$s=[Security.SecureString]::new();foreach($ch in $v.ToCharArray()){$s.AppendChar($ch)};return $s};return $v}; & '${path.join(dir,script).replaceAll("'","''")}' ${page}`;
+ return spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(code,'utf16le').toString('base64')],{encoding:'utf8',timeout:30000,windowsHide:true});
+}
+try{
+ let r=run('settings.ps1',['','Fixture University','12345','Fixture Student','n'],'-Page Account');assert.equal(r.status,0,r.stderr);const account=JSON.parse(fs.readFileSync(path.join(dir,'settings.json')));assert.equal(account.account,'12345');assert.equal(account.autoPostDiscussions,false);assert(fs.existsSync(path.join(dir,'data/12345/account.json')));
+ r=run('settings.ps1',['','Second University','67890','Second Student','n'],'-Page Account');assert.equal(r.status,0);assert.equal(JSON.parse(fs.readFileSync(path.join(dir,'settings.json'))).account,'67890');r=run('settings.ps1',['1'],'-Page Account');assert.equal(r.status,0);assert.equal(JSON.parse(fs.readFileSync(path.join(dir,'settings.json'))).account,'12345');
+ fs.writeFileSync(path.join(dir,'provider-settings.cjs'),"console.log('Fixture provider test only');");
+ r=run('setup-models.ps1',['https://example.com/v1','fixture-secret-key','answer-fixture','judge-fixture','vision-fixture']);assert.equal(r.status,0,r.stderr);const encrypted=fs.readFileSync(path.join(dir,'config/provider.dpapi'),'utf8');assert(!encrypted.includes('fixture-secret-key'));const value=JSON.parse(protect(encrypted,true));assert.equal(value.key,'fixture-secret-key');assert.equal(JSON.parse(fs.readFileSync(path.join(dir,'model-config.json'))).judgeModel,'judge-fixture');assert(!r.stdout.includes('fixture-secret-key'));
+ fs.writeFileSync(path.join(dir,'provider-settings.cjs'),'process.exit(1)');r=run('setup-models.ps1',['https://bad.example/v1','new-fixture-secret','bad-answer','bad-judge','bad-vision']);assert.notEqual(r.status,0);assert.equal(fs.readFileSync(path.join(dir,'config/provider.dpapi'),'utf8'),encrypted);assert(!fs.existsSync(path.join(dir,'config/provider-pending.dpapi')));
+ console.log('PASS Windows first-run account setup, encrypted model setup, hidden Key entry, failed model test preserves prior settings; real configuration untouched');
+}finally{assert(dir.startsWith(path.join(os.tmpdir(),'ocs-setup-fixture-')));fs.rmSync(dir,{recursive:true,force:true});}

@@ -1,0 +1,14 @@
+const assert=require('assert/strict'),fs=require('fs'),os=require('os'),path=require('path');
+const {chromium}=require('./browser-runtime.cjs'),{post}=require('./discussions.cjs');
+const directory=fs.mkdtempSync(path.join(os.tmpdir(),'zhs-discussion-'));
+const store={directory,read:(n,f)=>fs.existsSync(path.join(directory,n+'.json'))?JSON.parse(fs.readFileSync(path.join(directory,n+'.json'),'utf8')):f,save:(n,v)=>fs.writeFileSync(path.join(directory,n+'.json'),JSON.stringify(v))};
+const text='课程讨论测试内容。'.repeat(12),url='https://ai-smart-course-student-pro.zhihuishu.com/topicPage/123/456/789';
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});let published=false,sends=0;
+try{const context=await b.newContext();const p=await context.newPage();if(process.env.OCS_TEST_SHARED)await require('./background.cjs').registerTaskPage(context,p);await context.route('**/*',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:`<h1>章节讨论一</h1><div class="desc-row"><span class="desc-text">真实讨论题面</span></div><article>学号 999 无关回复</article>${published?'<article>学号 123 '+text+'</article>':''}<div id="stemEditorMain" contenteditable="true"></div><div class="submit-btn">发送</div><script>document.querySelector('.submit-btn').onclick=()=>{fetch('/published');const a=document.createElement('article');a.textContent='学号 123 '+document.querySelector('#stemEditorMain').innerText;document.body.appendChild(a)}</script>`}));
+await context.route('**/published',r=>{published=true;sends++;return r.fulfill({body:'ok'})});await p.goto(url);
+const options={account:'123',courseId:'123',title:'章节讨论一',store,log:()=>{},generate:async({prompt})=>{assert.equal(prompt,'真实讨论题面');return text}};
+await post(p,options);assert.equal(await p.locator('#stemEditorMain').evaluate(e=>e===document.activeElement),false,'Comment writing must not focus the editor');assert.equal(store.read('discussion-123-789').status,'verified');assert.equal(sends,1);
+await post(p,options);assert.equal(sends,1,'Existing own comment must not publish again');
+published=false;await p.goto(url);store.save('discussion-123-789',{status:'submitting'});await assert.rejects(()=>post(p,options),/未重复发布/);assert.equal(sends,1);
+console.log('PASS original prompt-only drafting, DOM content readback, fresh-page verification, existing and ambiguous comments never duplicate');
+}finally{await b.close();fs.rmSync(directory,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1});
