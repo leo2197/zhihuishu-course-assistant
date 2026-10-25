@@ -34,7 +34,15 @@ try{
         else {& (Get-OcsNode) (Join-Path $PSScriptRoot 'provider-settings.cjs') --test-file $pending --auto --output $detected}
         if($LASTEXITCODE -eq 0){break}
         Write-Host '检测失败，尚未保存本次设置；原来的可用设置保留。' -ForegroundColor Yellow
-        $retry=Read-Host '网络恢复后输入R使用本次地址和Key重新检测（不用重新粘贴Key）；回车结束后可修改设置'
+        $retry=Read-Host '输入R保留本次输入重试；输入K重新填写Key；回车取消（原设置保留）'
+        if($retry -match '^[kK]$'){
+            $secret=Read-Host '重新粘贴完整API Key（隐藏输入，不要附带说明）' -AsSecureString
+            if(-not $secret.Length){Write-Host '没有输入新Key，保留本次输入。';continue}
+            $pointer=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+            try{$apiKey=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)}finally{[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)}
+            Write-OcsPrivate $pending @{url=$url;key=$apiKey;answerModel=$answer;judgeModel=$judge}
+            continue
+        }
         if($retry -notmatch '^[rR]$'){throw '检测未通过，原设置已保留。请检查地址、Key、模型权限、余额或网络后重新设置。'}
     }
     if($Advanced){$models.answerModel=$answer;$models.judgeModel=$judge;$models.visionJudgeModel=$vision}else{$models=Read-OcsJson $detected}

@@ -22,5 +22,8 @@ const assert=require('assert/strict'),{auto,endpoint}=require('./provider-settin
  await assert.rejects(()=>auto({url:'https://example.com/v1',key:'fixture-secret'},{waitFn:noWait,log:quiet,fetchFn:async()=>{deniedAttempts++;return {ok:false,status:401};}}),/API Key/);assert.equal(deniedAttempts,1,'Do not retry invalid Key');
  await assert.rejects(()=>auto({url:'https://example.com/v1',key:'fixture-secret'},{waitFn:noWait,log:quiet,fetchFn:async()=>{throw Object.assign(new TypeError('fetch failed'),{cause:{code:'ENOTFOUND'}});}}),e=>e.message.includes('域名解析失败')&&!e.message.includes('fixture-secret'));
  await assert.rejects(()=>auto({url:'https://example.com/v1',key:'fixture-secret'},{waitFn:noWait,log:quiet,fetchFn:async()=>({ok:false,status:402})}),/余额/);
+ let invalidKeyRequests=0;
+ await assert.rejects(()=>auto({url:'https://open.bigmodel.cn',key:'中文密钥'},{fetchFn:async()=>{invalidKeyRequests++;return ok();},log:quiet}),/API Key含有/);assert.equal(invalidKeyRequests,0,'Malformed Key rejected before network access');
+ await assert.rejects(()=>auto({url:'https://example.com/v1',key:'fixture'},{waitFn:noWait,log:quiet,fetchFn:async()=>{throw Object.assign(new TypeError('fetch failed'),{cause:{code:'UND_ERR_INVALID_ARG'}});}}),/请求参数无效/);
  console.log('PASS automatic GLM endpoint/model configuration, other providers, unknown vision, advanced fallback, invalid Key and billing failures');
 })().catch(e=>{console.error(e);process.exitCode=1});

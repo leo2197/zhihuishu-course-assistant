@@ -8,7 +8,7 @@
 控制台不要求填写学校、学号、姓名。自动识别失败时才粘贴知识学习页完整网址。
 
 API Key隐藏输入，不显示字符是正常的；粘贴后按回车。
-连接检测临时失败会自动重试一次；仍失败输入R可保留本次地址和Key重试。
+连接检测临时失败会自动重试一次；仍失败输入R可保留本次地址和Key重试，输入K可重新填写Key。
 回车取消本次设置，不覆盖旧配置；退出后未保存Key会被清理。
 GLM接口：https://open.bigmodel.cn/api/paas/v4
 Key管理网页：https://open.bigmodel.cn/apikey/platform
