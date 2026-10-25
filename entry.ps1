@@ -1,11 +1,11 @@
 ﻿Set-Location -LiteralPath $PSScriptRoot
 . (Join-Path $PSScriptRoot 'setup-common.ps1')
-$Host.UI.RawUI.WindowTitle='智慧树 AI 智课助手'
+$Host.UI.RawUI.WindowTitle='智慧树课程助手'
 $first=$true;$configPath=Join-Path $PSScriptRoot 'settings.json'
 if(Test-Path -LiteralPath $configPath){try{$saved=Read-OcsJson $configPath;$first=-not $saved.account}catch{Write-Host '账号设置无法读取，将在启动时提示修复。';$first=$false}}
 if($first){Write-Host '首次使用：先填API地址与Key，检测通过后自动打开网页登录和选课。' -ForegroundColor Cyan;& (Join-Path $PSScriptRoot 'launch.ps1');exit $LASTEXITCODE}
 while($true){
-    Write-Host "`n========== 智慧树 AI 智课助手 ==========" -ForegroundColor Cyan
+    Write-Host "`n========== 智慧树课程助手 ==========" -ForegroundColor Cyan
     Write-Host "1 开始 / 继续学习（直接按回车）`n2 模型设置与检测`n3 选择或切换课程`n4 添加或切换账号`n5 并发窗口数量`n6 查看使用说明`n0 退出"
     Write-Host '首次选1，程序会引导设置和本人登录。修改设置前先结束正在运行的任务。'
     $choice=Read-Host '请选择';if(-not $choice){$choice='1'}

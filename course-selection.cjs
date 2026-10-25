@@ -4,17 +4,23 @@ function supported(value){try{const u=new URL(value);return u.hostname==='ai-sma
 function portal(value){try{const u=new URL(value);return u.hostname==='onlineweb.zhihuishu.com'&&u.pathname==='/onlinestuh5';}catch{return false;}}
 async function collect(page){
  if(!portal(page.url()))return [];
- try{return await page.locator('.hoverList').evaluateAll(cards=>cards.flatMap((card,index)=>{
-  if(!card.getClientRects().length||!card.querySelector('.tag-ai')||card.querySelector('.tag-ai').textContent.trim()!=='AI智课')return [];
-  const name=card.querySelector('.courseName')?.textContent.trim(),teacher=card.querySelector('.teacherName')?.textContent.trim()||'',semester=card.querySelector('.semester')?.textContent.trim()||'';
-  if(!name)return [];
-  return [{index,name,teacher,semester,signature:JSON.stringify([name,teacher,semester])}];
- }));}catch(error){if(/Execution context was destroyed|Cannot find context with specified id|most likely because of a navigation/i.test(error.message))return [];throw error;}
+ try{
+  const cards=await page.locator('.ai-course-card-item').evaluateAll(cards=>cards.flatMap((card,index)=>{
+   const kind=card.querySelector('.course-tag')?.textContent.trim()||'';
+   if(!card.getClientRects().length||getComputedStyle(card).visibility==='hidden'||!kind.startsWith('智慧课程'))return [];
+   const name=card.querySelector('.courseName')?.textContent.trim(),teacher=(card.querySelector('.courseTeacher')?.textContent||'').replace(/\s+/g,' ').trim(),url=(card.querySelector('a.study-btn')||card.querySelector('.courseName[href]'))?.href;
+   if(!name||!url)return [];
+   const progress=card.querySelector('.processNum')?.textContent.trim()||'';
+   return [{index,name,teacher,kind,url,progress,signature:JSON.stringify([name,teacher,kind,url])}];
+  }));
+  return cards.filter(c=>supported(c.url));
+ }catch(error){if(/Execution context was destroyed|Cannot find context with specified id|most likely because of a navigation/i.test(error.message))return [];throw error;}
 }
 async function openCourse(page,item,{timeoutMs=45000,pollMs=500,log=console.log}={}){
  const current=(await collect(page)).find(c=>c.index===item.index);
  if(!current||current.signature!==item.signature)throw Error('课程列表已变化，请输入R刷新后重新选择，未打开其他课程。');
- await quietClick(page.locator('.hoverList').nth(item.index).locator('.courseName'));
+ const card=page.locator('.ai-course-card-item').nth(item.index),button=card.locator('a.study-btn');
+ await quietClick(await button.count()===1?button:card.locator('.courseName[href]'));
  let deadline=Date.now()+timeoutMs,menuClicked=false;
  while(!page.isClosed()){
   if(supported(page.url()))return page.url();
@@ -31,7 +37,7 @@ async function openCourse(page,item,{timeoutMs=45000,pollMs=500,log=console.log}
 }
 async function select(page,settings,store,{log=console.log,ask,listWaitMs=15000,pollMs=500,saveSettings=value=>fs.writeFileSync(path.join(__dirname,'settings.json'),JSON.stringify(value,null,2))}={}){
  const login=await require('./login.cjs').prepare(page,settings,store,{log});
- log('【选择课程】请先在专用Edge完成本人登录和安全验证。登录后自动读取AI智课，在本窗口列出编号；输入编号即可开始。');
+ log('【选择课程】请先在专用Edge完成本人登录和安全验证。登录后自动读取“智慧课程”区域，在本窗口列出编号；输入编号即可开始。');
  log('也可在网页直接进入课程知识学习。未识别的课型不会自动开始，学习页网址仅作备用。');
  await page.goto('https://onlineweb.zhihuishu.com/onlinestuh5',{waitUntil:'domcontentloaded',timeout:45000});
  let busy=false,announced=false,stopped=false,selectedName='';
@@ -56,10 +62,10 @@ async function select(page,settings,store,{log=console.log,ask,listWaitMs=15000,
  }
  function show(courses){
   if(courses.length){
-   log('\n已识别 '+courses.length+' 门AI智课，请输入编号：');
-   courses.forEach((c,i)=>log((i+1)+'. '+c.name+(c.teacher?' ｜ '+c.teacher:'')+(c.semester?' ｜ '+c.semester:'')));
-   log('完成情况会在进入后按本课程成绩分析核对；不把其他课型或已免考项目当作待做任务。');
-  }else log('暂未识别到AI智课。可输入R刷新，或在网页打开AI智课的知识学习页。');
+   log('\n已识别 '+courses.length+' 门智慧课程，请输入编号：');
+   courses.forEach((c,i)=>log((i+1)+'. '+c.name+(c.teacher?' ｜ '+c.teacher:'')+(c.progress?' ｜ 页面学习进度 '+c.progress:'')));
+   log('这里只列智慧课程，不列前面的AI智课。页面学习进度100%仍会列出，掌握度、计分和免考情况进入后按成绩分析核对。');
+  }else log('暂未识别到可自动处理的智慧课程。可输入R刷新，或在网页打开目标课程的知识学习页。');
  }
  const input=(async()=>{
   let courses=await waitForList();if(stopped)return;show(courses);
@@ -74,7 +80,7 @@ async function select(page,settings,store,{log=console.log,ask,listWaitMs=15000,
     const chosen=courses[index];selectedName=chosen.name;log('已选择：'+chosen.name+'；正在打开知识学习……');
     try{await openCourse(page,chosen,{pollMs,log});selectedName=chosen.name;return page.url();}catch(error){selectedName='';if(stopped)return;log(error.message);continue;}
    }
-   if(!supported(value)){log('请输入上方课程序号、R，或已支持的AI智课知识学习页网址。');continue;}
+   if(!supported(value)){log('请输入上方课程序号、R，或已支持的智慧课程知识学习页网址。');continue;}
    await page.goto(value,{waitUntil:'domcontentloaded',timeout:45000});await page.waitForURL(u=>supported(u.href),{timeout:0});return page.url();
   }
  })();

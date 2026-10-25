@@ -1,6 +1,6 @@
 ﻿param([switch]$Check, [string]$ReadyFile)
 $ErrorActionPreference = 'Stop'
-$Host.UI.RawUI.WindowTitle = '智慧树 AI 智课助手'
+$Host.UI.RawUI.WindowTitle = '智慧树课程助手'
 $launchExit=0
 Set-Location -LiteralPath $PSScriptRoot
 try {

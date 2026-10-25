@@ -35,7 +35,7 @@ function Set-Account {
 function Select-Course {
     if(-not $settings.account){Set-Account}
     Save-Settings
-    Write-Host '即将打开专用浏览器：登录后自动列出AI智课，在脚本中输入编号即可选课。'
+    Write-Host '即将打开专用浏览器：登录后自动列出智慧课程，在脚本中输入编号即可选课。'
     & (Get-OcsNode) (Join-Path $PSScriptRoot 'console.cjs') --select-course-only
     if($LASTEXITCODE -ne 0){throw '课程选择未完成，原有提交记录保留。'}
     $script:settings=Read-OcsJson $settingsPath
