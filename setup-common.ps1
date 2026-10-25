@@ -43,3 +43,18 @@ function Assert-OcsStopped {
     $lock=Join-Path $PSScriptRoot 'runtime.json'
     if(Test-Path -LiteralPath $lock){$state=Read-OcsJson $lock;if(Get-Process -Id $state.pid -ErrorAction SilentlyContinue){throw '任务正在运行。请先结束当前任务，再切换账号、课程或模型；当前任务不会被设置程序强制关闭。'}}
 }
+
+function Convert-OcsApiSecret([Security.SecureString]$Secret,[scriptblock]$ReadClipboard={
+    [void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
+    [Windows.Forms.Clipboard]::GetText()
+}) {
+    $pointer=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($Secret)
+    try{$text=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)}finally{[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)}
+    # Windows PowerShell can pass Ctrl+V to Read-Host as U+0016 instead of pasting.
+    if($text -match '^\x16+$'){
+        Write-Host '已识别Ctrl+V粘贴，正在接收剪贴板文本（内容不会显示）。'
+        try{$text=& $ReadClipboard}catch{throw '无法读取剪贴板，请重新复制Key，再用鼠标右键粘贴。'}
+        if(-not $text){throw '剪贴板没有文字，请先复制完整API Key，再重新粘贴。'}
+    }
+    return $text
+}

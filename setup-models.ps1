@@ -15,7 +15,7 @@ if(-not $url){throw '未填写API地址，没有修改原设置。'}
 Write-Host 'API Key粘贴后不显示字符是正常现象，粘贴完按回车继续；不要发送截图或把Key发给他人。'
 $secret=Read-Host 'API Key（输入隐藏；留空保留原Key）' -AsSecureString
 $apiKey=$old.key
-if($secret.Length){$pointer=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret);try{$apiKey=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)}finally{[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)}}
+if($secret.Length){$apiKey=Convert-OcsApiSecret $secret}
 if(-not $apiKey){throw '未填写API Key，没有修改原设置。'}
 $answer='';$judge='';$vision=''
 if($Advanced){
@@ -38,8 +38,7 @@ try{
         if($retry -match '^[kK]$'){
             $secret=Read-Host '重新粘贴完整API Key（隐藏输入，不要附带说明）' -AsSecureString
             if(-not $secret.Length){Write-Host '没有输入新Key，保留本次输入。';continue}
-            $pointer=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
-            try{$apiKey=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)}finally{[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)}
+            $apiKey=Convert-OcsApiSecret $secret
             Write-OcsPrivate $pending @{url=$url;key=$apiKey;answerModel=$answer;judgeModel=$judge}
             continue
         }
