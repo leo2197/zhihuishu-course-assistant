@@ -1,6 +1,6 @@
 # 智慧树 AI 智课助手（Windows 测试版）
 
-[下载 Windows 运行包](https://github.com/leo2197/zhihuishu-course-assistant/releases/download/v0.1.0-alpha.4/Windows-x64.zip) · [版本说明](https://github.com/leo2197/zhihuishu-course-assistant/releases/tag/v0.1.0-alpha.4) · [常见问题](FAQ.md)
+[下载 Windows 运行包](https://github.com/leo2197/zhihuishu-course-assistant/releases/download/v0.1.0-alpha.5/Windows-x64.zip) · [版本说明](https://github.com/leo2197/zhihuishu-course-assistant/releases/tag/v0.1.0-alpha.5) · [常见问题](FAQ.md)
 
 根据成绩分析处理未完成的计分视频、掌握度和可选讨论。适用Windows 10/11 x64与当前已实现的智慧树AI智课课型，不代表全部智慧树课程均兼容。
 
@@ -17,7 +17,7 @@ Windows运行包自带Node和依赖，需要已有Microsoft Edge。GitHub自动�
 ## 推荐GLM，也允许自由配置
 
 - 默认API地址：`https://open.bigmodel.cn/api/paas/v4`。GLM的Key管理网页是`https://open.bigmodel.cn/apikey/platform`，不是API地址；本工具会识别这一误填并使用官方接口。
-- GLM优先检测主答、裁决与可确认的图像模型，实际选择会显示出来，权限不够会明确提示。检测失败不覆盖原来的可用设置。
+- GLM优先检测主答、裁决与可确认的图像模型，实际选择会显示出来，权限不够会明确提示。检测失败不覆盖原来的可用设置。临时连接失败会自动重试一次；仍失败可输入R，用本次地址和Key重新检测，不必重新粘贴Key。GLM模型列表不可用时，继续用实际调用检测官方已知模型。
 - 其他兼容服务：填写其Chat Completions接口与自己的Key，优先自动读取模型列表。服务未开放列表时，会提示进入高级设置，不强制更换服务商。
 - 自选模型：启动菜单→2“模型设置”→输入2“高级”，自行填写主答、裁决与可选图像模型ID。默认自动模式只问地址和Key。
 - 图像能力未确认时，图片题交本人核对，不把文字模型当图像模型。

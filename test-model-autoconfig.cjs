@@ -11,5 +11,16 @@ const assert=require('assert/strict'),{auto,endpoint}=require('./provider-settin
  await assert.rejects(()=>auto({url:'https://example.com/v1',key:'fixture'},{fetchFn:async()=>({ok:false,status:404}),log:()=>{}}),/高级/);
  await assert.rejects(()=>auto({url:'https://example.com/v1',key:'fixture'},{fetchFn:async()=>({ok:false,status:401}),log:()=>{}}),/API Key/);
  await assert.rejects(()=>auto({url:'https://open.bigmodel.cn',key:'fixture'},{fetchFn:async url=>url.endsWith('/models')?{ok:false,status:404}:{ok:false,status:402},log:()=>{}}),/余额/);
+ const noWait=async()=>{},quiet=()=>{},transient=()=>Object.assign(new TypeError('fetch failed'),{cause:{code:'ECONNRESET'}});
+ let listAttempts=0;const signals=[];
+ result=await auto({url:'https://example.com/v1',key:'fixture-secret'},{waitFn:noWait,log:quiet,fetchFn:async(url,options)=>{if(url.endsWith('/models')){signals.push(options.signal);if(++listAttempts===1)throw transient();return {ok:true,json:async()=>({data:[{id:'deepseek-chat'}]})};}return ok();}});
+ assert.equal(listAttempts,2);assert.notEqual(signals[0],signals[1]);assert.equal(result.answerModel,'deepseek-chat');
+ let postAttempts=0;
+ result=await auto({url:'https://open.bigmodel.cn',key:'fixture-secret'},{waitFn:noWait,log:quiet,fetchFn:async url=>{if(url.endsWith('/models'))throw transient();postAttempts++;if(postAttempts===1)throw transient();return ok();}});
+ assert.equal(result.answerModel,'glm-5.3-flash');assert.equal(postAttempts,3,'Retry failed primary once, then verify judge');
+ let deniedAttempts=0;
+ await assert.rejects(()=>auto({url:'https://example.com/v1',key:'fixture-secret'},{waitFn:noWait,log:quiet,fetchFn:async()=>{deniedAttempts++;return {ok:false,status:401};}}),/API Key/);assert.equal(deniedAttempts,1,'Do not retry invalid Key');
+ await assert.rejects(()=>auto({url:'https://example.com/v1',key:'fixture-secret'},{waitFn:noWait,log:quiet,fetchFn:async()=>{throw Object.assign(new TypeError('fetch failed'),{cause:{code:'ENOTFOUND'}});}}),e=>e.message.includes('域名解析失败')&&!e.message.includes('fixture-secret'));
+ await assert.rejects(()=>auto({url:'https://example.com/v1',key:'fixture-secret'},{waitFn:noWait,log:quiet,fetchFn:async()=>({ok:false,status:402})}),/余额/);
  console.log('PASS automatic GLM endpoint/model configuration, other providers, unknown vision, advanced fallback, invalid Key and billing failures');
 })().catch(e=>{console.error(e);process.exitCode=1});

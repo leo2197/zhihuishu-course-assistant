@@ -22,19 +22,38 @@ function load(source=file){
  }
  throw Error('尚未配置模型：请双击“启动.cmd”菜单中的“模型设置与检测”，选择“模型设置”，填写服务地址、API Key和模型ID');
 }
-async function test(value,{fetchFn=fetch}={}){
+function networkHint(error){
+ const code=error.cause?.code||error.code||'';
+ if(/ENOTFOUND|EAI_AGAIN/.test(code))return '域名解析失败';
+ if(/CERT|TLS|SSL|SELF_SIGNED/.test(code))return 'HTTPS证书校验失败，请检查系统时间或网络证书';
+ if(/ECONNREFUSED/.test(code))return '连接被拒绝';
+ if(/TIMEOUT|ETIMEDOUT/.test(code)||/timeout|abort/i.test(error.name+' '+error.message))return '连接超时';
+ return '网络连接中断';
+}
+async function connect(fetchFn,url,options,{timeout,log=console.log,waitFn=ms=>new Promise(r=>setTimeout(r,ms))}={}){
+ for(let attempt=0;attempt<2;attempt++){
+  try{return await fetchFn(url,{...options,signal:AbortSignal.timeout(timeout)});}
+  catch(error){
+   const transient=/fetch failed|timeout|abort|ECONN|ENOTFOUND|EAI_AGAIN/i.test(error.message+' '+error.name+' '+(error.cause?.code||error.code||''));
+   if(!transient)throw error;
+   if(attempt===0){log('模型接口连接暂时失败，正在自动重试（2/2）……');await waitFn(800);continue;}
+   throw Error('无法连接模型服务：'+networkHint(error)+'。请检查API地址和网络，或按提示重试；这不代表Key无效。',{cause:error});
+  }
+ }
+}
+async function test(value,{fetchFn=fetch,log=console.log,waitFn}={}){
  const url=endpoint(value.url),models=[...new Set([value.answerModel,value.judgeModel].filter(Boolean))];
  if(!value.key||models.length===0)throw Error('API Key、主答模型与裁决模型不能为空');
  for(const model of models){
-  const response=await fetchFn(url,{method:'POST',headers:{Authorization:'Bearer '+value.key,'Content-Type':'application/json'},signal:AbortSignal.timeout(45000),body:JSON.stringify({model,messages:[{role:'user',content:'Reply OK.'}],max_tokens:32})});
+  const response=await connect(fetchFn,url,{method:'POST',headers:{Authorization:'Bearer '+value.key,'Content-Type':'application/json'},body:JSON.stringify({model,messages:[{role:'user',content:'Reply OK.'}],max_tokens:32})},{timeout:45000,log,waitFn});
   if(!response.ok)throw Error(response.status===401?'API Key无效或已失效':response.status===402?'模型服务提示余额不足':response.status===404?'接口地址或模型ID不存在':response.status===429?'模型服务限流，请稍后检测':'模型检测失败，HTTP '+response.status);
   const body=await response.json();if(!body.choices?.[0]?.message)throw Error('服务响应不兼容Chat Completions接口');
  }
  return true;
 }
-async function auto(value,{fetchFn=fetch,log=console.log}={}){
+async function auto(value,{fetchFn=fetch,log=console.log,waitFn}={}){
  const url=endpoint(value.url),official=new URL(url).hostname==='open.bigmodel.cn';let listed=[];
- try{const response=await fetchFn(url.replace(/\/chat\/completions$/,'/models'),{headers:{Authorization:'Bearer '+value.key},signal:AbortSignal.timeout(15000)});if(response.status===401)throw Error('API Key无效或已失效');if(response.ok){const data=await response.json();listed=(data.data||[]).filter(m=>typeof m.id==='string'&&!/embedding|rerank|whisper|tts|image-gen|dall-e/i.test(m.id));}}catch(error){if(/API Key/.test(error.message))throw error;if(/fetch failed|timeout|abort|ENOTFOUND/i.test(error.message))throw Error('无法连接模型服务，请检查API地址和网络后重试');}
+ try{const response=await connect(fetchFn,url.replace(/\/chat\/completions$/,'/models'),{headers:{Authorization:'Bearer '+value.key}},{timeout:15000,log,waitFn});if(response.status===401)throw Error('API Key无效或已失效');if(response.status===402)throw Error('模型服务提示余额不足');if(response.status===429)throw Error('模型服务限流，请稍后检测');if(response.ok){const data=await response.json();listed=(data.data||[]).filter(m=>typeof m.id==='string'&&!/embedding|rerank|whisper|tts|image-gen|dall-e/i.test(m.id));}}catch(error){if(/API Key|余额|限流/.test(error.message))throw error;if(official){log('模型列表暂不可用，继续检测GLM官方已知模型；以实际调用结果为准。');}else if(/无法连接|fetch failed|timeout|abort|ENOTFOUND/i.test(error.message))throw error;}
  const find=id=>listed.find(m=>m.id.toLowerCase()===id),ids=listed.map(m=>m.id);
  const prefer=['glm-5.3-flash','glm-5.3','glm-5','glm-4.7','glm-4.6','deepseek-reasoner','deepseek-chat'];
  const primary=prefer.map(find).find(Boolean)||listed[0];
@@ -44,8 +63,8 @@ async function auto(value,{fetchFn=fetch,log=console.log}={}){
  if(official&&!listed.length)judgeModel='glm-5.3';
  let visionJudgeModel=listed.find(m=>m.id.toLowerCase()==='glm-5.3-flash'||m.input_modalities?.includes('image')||m.capabilities?.vision===true)?.id||(official&&!listed.length?'glm-5.3-flash':'');
  log('自动识别主答：'+answerModel+'；裁决：'+judgeModel+'；图像：'+(visionJudgeModel||'未确认，图片题交人工核对'));
- await test({...value,url,answerModel,judgeModel:answerModel},{fetchFn});
- if(judgeModel!==answerModel){try{await test({...value,url,answerModel:judgeModel},{fetchFn});}catch(error){if(/余额|限流|Key|超时|fetch failed/.test(error.message))throw error;log('裁决模型不可用，使用已检测通过的主答模型裁决：'+answerModel);judgeModel=answerModel;}}
+ await test({...value,url,answerModel,judgeModel:answerModel},{fetchFn,log,waitFn});
+ if(judgeModel!==answerModel){try{await test({...value,url,answerModel:judgeModel},{fetchFn,log,waitFn});}catch(error){if(/余额|限流|Key|超时|fetch failed|无法连接/.test(error.message))throw error;log('裁决模型不可用，使用已检测通过的主答模型裁决：'+answerModel);judgeModel=answerModel;}}
  return {answerModel,judgeModel,visionJudgeModel,reasoningEffort:'high',timeoutMs:90000,autoSubmit:true};
 }
 if(require.main===module){

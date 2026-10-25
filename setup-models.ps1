@@ -29,9 +29,14 @@ $pending=Join-Path $PSScriptRoot 'config/provider-pending.dpapi'
 try{
     Write-OcsPrivate $pending @{url=$url;key=$apiKey;answerModel=$answer;judgeModel=$judge}
     $detected=Join-Path $PSScriptRoot 'config/models-pending.json'
-    if($Advanced){& (Get-OcsNode) (Join-Path $PSScriptRoot 'provider-settings.cjs') --test-file $pending}
-    else {& (Get-OcsNode) (Join-Path $PSScriptRoot 'provider-settings.cjs') --test-file $pending --auto --output $detected}
-    if($LASTEXITCODE -ne 0){throw '检测未通过，原设置已保留。请检查地址、Key、模型权限、余额或网络后重新设置。'}
+    while($true){
+        if($Advanced){& (Get-OcsNode) (Join-Path $PSScriptRoot 'provider-settings.cjs') --test-file $pending}
+        else {& (Get-OcsNode) (Join-Path $PSScriptRoot 'provider-settings.cjs') --test-file $pending --auto --output $detected}
+        if($LASTEXITCODE -eq 0){break}
+        Write-Host '检测失败，尚未保存本次设置；原来的可用设置保留。' -ForegroundColor Yellow
+        $retry=Read-Host '网络恢复后输入R使用本次地址和Key重新检测（不用重新粘贴Key）；回车结束后可修改设置'
+        if($retry -notmatch '^[rR]$'){throw '检测未通过，原设置已保留。请检查地址、Key、模型权限、余额或网络后重新设置。'}
+    }
     if($Advanced){$models.answerModel=$answer;$models.judgeModel=$judge;$models.visionJudgeModel=$vision}else{$models=Read-OcsJson $detected}
     if(-not $models.answerModel -or -not $models.judgeModel){throw '自动识别未返回可用模型；原设置保留，可进入高级模式自选。'}
     Move-Item -LiteralPath $pending -Destination $providerFile -Force
