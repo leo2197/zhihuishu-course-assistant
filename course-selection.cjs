@@ -1,26 +1,90 @@
 const fs=require('fs'),path=require('path'),readline=require('readline/promises');
+const {quietClick}=require('./interaction.cjs');
 function supported(value){try{const u=new URL(value);return u.hostname==='ai-smart-course-student-pro.zhihuishu.com'&&/^\/singleCourse\/knowledgeStudy\/\d+\/\d+\/?$/.test(u.pathname);}catch{return false;}}
-async function select(page,settings,store,{log=console.log,ask,saveSettings=value=>fs.writeFileSync(path.join(__dirname,'settings.json'),JSON.stringify(value,null,2))}={}){
+function portal(value){try{const u=new URL(value);return u.hostname==='onlineweb.zhihuishu.com'&&u.pathname==='/onlinestuh5';}catch{return false;}}
+async function collect(page){
+ if(!portal(page.url()))return [];
+ try{return await page.locator('.hoverList').evaluateAll(cards=>cards.flatMap((card,index)=>{
+  if(!card.getClientRects().length||!card.querySelector('.tag-ai')||card.querySelector('.tag-ai').textContent.trim()!=='AI智课')return [];
+  const name=card.querySelector('.courseName')?.textContent.trim(),teacher=card.querySelector('.teacherName')?.textContent.trim()||'',semester=card.querySelector('.semester')?.textContent.trim()||'';
+  if(!name)return [];
+  return [{index,name,teacher,semester,signature:JSON.stringify([name,teacher,semester])}];
+ }));}catch(error){if(/Execution context was destroyed|Cannot find context with specified id|most likely because of a navigation/i.test(error.message))return [];throw error;}
+}
+async function openCourse(page,item,{timeoutMs=45000,pollMs=500,log=console.log}={}){
+ const current=(await collect(page)).find(c=>c.index===item.index);
+ if(!current||current.signature!==item.signature)throw Error('课程列表已变化，请输入R刷新后重新选择，未打开其他课程。');
+ await quietClick(page.locator('.hoverList').nth(item.index).locator('.courseName'));
+ let deadline=Date.now()+timeoutMs,menuClicked=false;
+ while(!page.isClosed()){
+  if(supported(page.url()))return page.url();
+  if(await require('./gate.cjs').hasCaptcha(page)){await require('./gate.cjs').waitForHuman(page,{log});deadline=Date.now()+timeoutMs;}
+  const u=new URL(page.url());
+  if(u.hostname==='ai-smart-course-student-pro.zhihuishu.com'&&!menuClicked){
+   const menu=page.getByText('知识学习',{exact:true});
+   if(await menu.count()===1&&await menu.isVisible()){await quietClick(menu);menuClicked=true;}
+  }
+  if(Date.now()>deadline)throw Error('课程入口尚未进入知识学习页，可输入R刷新，或在网页打开知识学习。');
+  await page.waitForTimeout(pollMs);
+ }
+ throw Error('课程浏览器已关闭，未开始学习任务。');
+}
+async function select(page,settings,store,{log=console.log,ask,listWaitMs=15000,pollMs=500,saveSettings=value=>fs.writeFileSync(path.join(__dirname,'settings.json'),JSON.stringify(value,null,2))}={}){
  const login=await require('./login.cjs').prepare(page,settings,store,{log});
- log('【选择课程】浏览器已打开“我的学堂”。请登录后点击要学习的AI智课，再打开左侧“知识学习”；脚本会自动识别并记住这门课。');
- log('当前已验证的是AI智课课型。普通智慧课程或其他平台不会自动开始；也可粘贴AI智课学习页完整网址。');
+ log('【选择课程】请先在专用Edge完成本人登录和安全验证。登录后自动读取AI智课，在本窗口列出编号；输入编号即可开始。');
+ log('也可在网页直接进入课程知识学习。未识别的课型不会自动开始，学习页网址仅作备用。');
  await page.goto('https://onlineweb.zhihuishu.com/onlinestuh5',{waitUntil:'domcontentloaded',timeout:45000});
- let busy=false,announced=false;
- const timer=setInterval(async()=>{if(busy||page.isClosed())return;busy=true;try{
+ let busy=false,announced=false,stopped=false,selectedName='';
+ const timer=setInterval(async()=>{if(busy||stopped||page.isClosed())return;busy=true;try{
   if(new URL(page.url()).hostname==='login.zhihuishu.com'){
    if(!announced){announced=true;log(login.notice());login.notifyInitial();}
    if(await require('./gate.cjs').hasCaptcha(page))await require('./gate.cjs').waitForHuman(page,{log});else await login.tick();
   }
  }catch{}finally{busy=false;}},1500);timer.unref();
  const controller=new AbortController(),rl=ask?null:readline.createInterface({input:process.stdin,output:process.stdout});
- const input=(async()=>{for(;;){const value=(await (ask?ask():rl.question('网页选课会自动继续；仅识别失败时粘贴知识学习页网址后回车：',{signal:controller.signal}))).trim();if(!supported(value)){log('这不是已支持的AI智课学习目录网址，请重新选择或粘贴。');continue;}await page.goto(value,{waitUntil:'domcontentloaded',timeout:45000});await page.waitForURL(u=>supported(u.href),{timeout:0});return page.url();}})();
+ const read=prompt=>ask?ask(prompt):rl.question(prompt,{signal:controller.signal});
+ async function waitForList(){
+  let deadline=Date.now()+listWaitMs;
+  while(!stopped&&!page.isClosed()){
+   if(supported(page.url()))return [];
+   if(!portal(page.url()))deadline=Date.now()+listWaitMs;
+   const courses=await collect(page);if(courses.length)return courses;
+   if(portal(page.url())&&Date.now()>=deadline)return [];
+   await page.waitForTimeout(pollMs);
+  }
+  return [];
+ }
+ function show(courses){
+  if(courses.length){
+   log('\n已识别 '+courses.length+' 门AI智课，请输入编号：');
+   courses.forEach((c,i)=>log((i+1)+'. '+c.name+(c.teacher?' ｜ '+c.teacher:'')+(c.semester?' ｜ '+c.semester:'')));
+   log('完成情况会在进入后按本课程成绩分析核对；不把其他课型或已免考项目当作待做任务。');
+  }else log('暂未识别到AI智课。可输入R刷新，或在网页打开AI智课的知识学习页。');
+ }
+ const input=(async()=>{
+  let courses=await waitForList();if(stopped)return;show(courses);
+  for(;;){
+   const value=String(await read('课程序号（R刷新；也可粘贴知识学习页网址）：')).trim();
+   if(/^r$/i.test(value)){
+    if(portal(page.url()))await page.reload({waitUntil:'domcontentloaded',timeout:45000});else await page.goto('https://onlineweb.zhihuishu.com/onlinestuh5',{waitUntil:'domcontentloaded',timeout:45000});
+    courses=await waitForList();if(stopped)return;show(courses);continue;
+   }
+   if(/^\d+$/.test(value)){
+    const index=Number(value)-1;if(!Number.isSafeInteger(index)||index<0||index>=courses.length){log('没有这个课程序号，请按上方列表选择，或输入R刷新。');continue;}
+    const chosen=courses[index];selectedName=chosen.name;log('已选择：'+chosen.name+'；正在打开知识学习……');
+    try{await openCourse(page,chosen,{pollMs,log});selectedName=chosen.name;return page.url();}catch(error){selectedName='';if(stopped)return;log(error.message);continue;}
+   }
+   if(!supported(value)){log('请输入上方课程序号、R，或已支持的AI智课知识学习页网址。');continue;}
+   await page.goto(value,{waitUntil:'domcontentloaded',timeout:45000});await page.waitForURL(u=>supported(u.href),{timeout:0});return page.url();
+  }
+ })();
  const browser=page.waitForURL(u=>supported(u.href),{timeout:0,waitUntil:'domcontentloaded'}).then(()=>page.url());
  try{
   const url=await Promise.race([browser,input]);settings.courseUrl=url;
-  const title=(await page.title()).trim();settings.courseName=title&&!/智慧树|AI智课/.test(title)?title:'所选课程';
+  const title=(await page.title()).trim();settings.courseName=selectedName||(title&&!/智慧树|AI智课|新形态课程/.test(title)?title:'所选课程');
   saveSettings(settings);
   store.save('account',{account:settings.account,school:settings.school||'',expectedDisplayName:settings.expectedDisplayName,courseUrl:url,courseName:settings.courseName,browserProfile:settings.browserProfile});
   log('课程已选择，接下来核对姓名和学号；核对通过前不会提交课程任务。');return url;
- }finally{clearInterval(timer);controller.abort();rl?.close();input.catch(()=>{});}
+ }finally{stopped=true;clearInterval(timer);controller.abort();rl?.close();input.catch(()=>{});}
 }
-module.exports={select,supported};
+module.exports={select,supported,collect,openCourse};

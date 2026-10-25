@@ -23,7 +23,7 @@ function Set-Account {
         $settings.account='';$settings.expectedDisplayName='';$settings.courseUrl='';$settings.courseName=''
         $settings | Add-Member -NotePropertyName browserProfile -NotePropertyValue '' -Force
         Save-Settings
-        Write-Host '请直接在即将打开的网页登录并选择课程，个人信息会从本人课程页读取。' -ForegroundColor Cyan
+        Write-Host '请在即将打开的网页本人登录，再回脚本输入课程序号；个人信息会从本人课程页读取。' -ForegroundColor Cyan
         & (Get-OcsNode) (Join-Path $PSScriptRoot 'console.cjs') --login-only
         if($LASTEXITCODE -ne 0){throw '网页登录未完成，原账号资料仍保留。'}
         $script:settings=Read-OcsJson $settingsPath
@@ -35,7 +35,7 @@ function Set-Account {
 function Select-Course {
     if(-not $settings.account){Set-Account}
     Save-Settings
-    Write-Host '即将打开专用浏览器：登录后在“我的学堂”点击要学习的AI智课。脚本会记住选择，无需复制配置文件。'
+    Write-Host '即将打开专用浏览器：登录后自动列出AI智课，在脚本中输入编号即可选课。'
     & (Get-OcsNode) (Join-Path $PSScriptRoot 'console.cjs') --select-course-only
     if($LASTEXITCODE -ne 0){throw '课程选择未完成，原有提交记录保留。'}
     $script:settings=Read-OcsJson $settingsPath
@@ -50,7 +50,7 @@ if($Page -eq 'FirstRun'){
     Save-Settings
     $providerCheck=& (Get-OcsNode) -e "try{require('./provider-settings.cjs').load();process.exit(0)}catch{process.exit(1)}"
     $providerFailed=$LASTEXITCODE -ne 0;$modelState=Read-OcsJson (Join-Path $PSScriptRoot 'model-config.json');if($providerFailed -or -not $modelState.answerModel -or -not $modelState.judgeModel){& (Join-Path $PSScriptRoot 'setup-models.ps1') -SkipRunningCheck}
-    Write-Host 'API设置完成。接下来自动打开网页，请本人登录后打开课程的知识学习目录。'
+    Write-Host 'API设置完成。接下来自动打开网页；本人登录后回脚本输入课程序号。'
     exit
 }
 switch($Page){'Account'{Set-Account;exit};'Models'{$mode=Read-OcsValue '回车自动检测模型，输入2使用高级自选模型' '1';if($mode -eq '2'){& (Join-Path $PSScriptRoot 'setup-models.ps1') -Advanced}else{& (Join-Path $PSScriptRoot 'setup-models.ps1')};exit};'Course'{Select-Course;exit};'Parallel'{Set-Parallel;exit}}

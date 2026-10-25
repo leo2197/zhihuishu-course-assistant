@@ -65,7 +65,7 @@ async function run(){
    settings.discoverIdentity=true;
    const pendingStore={directory:path.join(__dirname,'work','pending-login'),save(){}};
    const helper=await require('./login.cjs').prepare(page,settings,pendingStore);
-   console.log('首次使用：请直接在网页选择学校并登录，完成验证后打开要学习的AI智课；不用在控制台填写个人信息。');
+   console.log('首次使用：请在网页选择学校并登录，完成验证后回脚本输入课程序号；不用在控制台填写个人信息。');
    await require('./course-selection.cjs').select(page,settings,pendingStore,{saveSettings:()=>{}});
    await require('./web-login.cjs').discover(page,settings,helper);context.ocsVerificationStatusFile=path.join(__dirname,'data',settings.account,'verification-status.json');
   }
@@ -73,7 +73,7 @@ async function run(){
    const store=new (require('./state.cjs').Store)(settings.account);await require('./course-selection.cjs').select(page,settings,store);
    if(process.argv.includes('--select-course-only')){await require('./workflow.cjs').verifyIdentity(context,settings,store);await require('./session-transfer.cjs').save(context,settings.account);console.log('已记住此账号的课程。下次点击启动即可继续。');return;}
   }
-  if(process.argv.includes('--login-only')){const store=new (require('./state.cjs').Store)(settings.account);await require('./workflow.cjs').verifyIdentity(context,settings,store);await require('./session-transfer.cjs').save(context,settings.account);console.log('网页登录已记住。接下来只需设置API地址和Key，随后自动返回课程。');return;}
+  if(process.argv.includes('--login-only')){const store=new (require('./state.cjs').Store)(settings.account);await require('./workflow.cjs').verifyIdentity(context,settings,store);await require('./session-transfer.cjs').save(context,settings.account);console.log('网页登录和课程已记住。下次启动可继续，模型设置可在启动菜单调整。');return;}
   if(process.argv.includes('--verify-only')){
    const store=new (require('./state.cjs').Store)(settings.account);
    await require('./workflow.cjs').verifyIdentity(context,settings,store);

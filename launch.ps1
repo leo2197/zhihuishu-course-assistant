@@ -23,7 +23,7 @@ try {
     & $node (Join-Path $PSScriptRoot 'console.cjs') --check
     if ($LASTEXITCODE -ne 0) { throw '程序组件检查失败。请重新完整解压Windows运行包，不要只复制启动文件。' }
     if ($ReadyFile) { @{status='ready'; pid=$PID} | ConvertTo-Json | Set-Content -LiteralPath $ReadyFile -Encoding UTF8 }
-    if (-not $Check) { Write-Host '[4/4] 打开专用浏览器；首次本人登录并完成验证，之后选择课程。请保留本窗口。' -ForegroundColor Cyan; & $node (Join-Path $PSScriptRoot 'console.cjs');$launchExit=$LASTEXITCODE }
+    if (-not $Check) { Write-Host '[4/4] 打开专用浏览器；首次本人登录并完成验证，之后回脚本输入课程序号。请保留本窗口。' -ForegroundColor Cyan; & $node (Join-Path $PSScriptRoot 'console.cjs');$launchExit=$LASTEXITCODE }
 } catch {
     $launchExit=1
     Write-Host $_.Exception.Message -ForegroundColor Red

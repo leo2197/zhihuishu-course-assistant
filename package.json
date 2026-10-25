@@ -1,6 +1,6 @@
 {
   "name": "zhihuishu-course-assistant",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.6",
   "private": true,
   "description": "Windows智慧树AI智课学习辅助工具（实验版）",
   "engines": {
